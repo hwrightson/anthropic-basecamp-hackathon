@@ -23,6 +23,8 @@ A subagent swarm that assesses the trustworthiness of any AI/agentic GitHub repo
 - [The 22 risks assessed](#the-22-risks-assessed)
 - [Setup](#setup)
 - [Usage](#usage)
+  - [Web app](#web-app)
+  - [CLI](#cli)
 - [Output](#output)
 - [Repo structure](#repo-structure)
 - [Running tests](#running-tests)
@@ -135,6 +137,22 @@ cp .env.example .env
 ---
 
 ## Usage
+
+### Web app
+
+```bash
+# From the project root
+export ANTHROPIC_API_KEY="your-key-here"
+export GITHUB_TOKEN="your-github-token"   # optional — needed for private repos
+
+uvicorn web.server:app --port 8080
+```
+
+Then open **http://localhost:8080** in your browser.
+
+To avoid re-exporting on every restart, add the two `export` lines to your `~/.zshrc` (or `~/.bashrc`) and they'll be set automatically on every login.
+
+### CLI
 
 ```bash
 python -m trust_swarm https://github.com/org/repo
