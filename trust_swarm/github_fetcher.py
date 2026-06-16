@@ -1,6 +1,6 @@
 import base64
 import os
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 import httpx
 
@@ -53,8 +53,11 @@ def fetch_repo_files(owner: str, repo: str, github_token: str | None = None) -> 
         headers["Authorization"] = f"Bearer {github_token}"
 
     tree_url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/HEAD?recursive=1"
-    tree_resp = httpx.get(tree_url, headers=headers, timeout=30)
-    tree_resp.raise_for_status()
+    try:
+        tree_resp = httpx.get(tree_url, headers=headers, timeout=30)
+        tree_resp.raise_for_status()
+    except httpx.RequestError as exc:
+        raise ValueError(f"Failed to fetch repo tree: {exc}") from exc
 
     entries = prioritise_files(tree_resp.json().get("tree", []))[:MAX_FILES]
 
@@ -64,8 +67,11 @@ def fetch_repo_files(owner: str, repo: str, github_token: str | None = None) -> 
     for entry in entries:
         if total_bytes >= MAX_TOTAL_BYTES:
             break
-        content_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{entry['path']}"
-        resp = httpx.get(content_url, headers=headers, timeout=30)
+        content_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{quote(entry['path'], safe='/')}"
+        try:
+            resp = httpx.get(content_url, headers=headers, timeout=30)
+        except httpx.RequestError:
+            continue
         if resp.status_code != 200:
             continue
         data = resp.json()
@@ -76,6 +82,8 @@ def fetch_repo_files(owner: str, repo: str, github_token: str | None = None) -> 
         except Exception:
             continue
         total_bytes += len(text.encode())
+        if total_bytes > MAX_TOTAL_BYTES:
+            break
         files.append({"path": entry["path"], "content": text})
 
     return files
