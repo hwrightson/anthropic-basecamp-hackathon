@@ -48,7 +48,7 @@ async def _run_specialist(
     user_content = f"Here is the trust brief for the repository:\n\n{json.dumps(trust_brief, indent=2)}"
 
     response = await client.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-sonnet-4-5-20250929",
         max_tokens=4096,
         system=system_prompt,
         messages=[{"role": "user", "content": user_content}],

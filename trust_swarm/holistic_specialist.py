@@ -27,8 +27,6 @@ HOLISTIC_SCHEMA = {
             "top_3_recommendations": {
                 "type": "array",
                 "items": {"type": "string"},
-                "minItems": 3,
-                "maxItems": 3,
             },
         },
         "required": ["compound_risks", "overall_verdict", "top_3_recommendations"],
@@ -48,7 +46,7 @@ def run_holistic_specialist(domain_results: list[dict]) -> dict:
     )
 
     response = client.messages.create(
-        model="claude-opus-4-7",
+        model="claude-sonnet-4-5-20250929",
         max_tokens=4096,
         system=build_holistic_prompt(),
         messages=[{"role": "user", "content": user_content}],

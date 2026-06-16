@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trust Swarm</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 272px;
+  --sidebar-bg: #171717;
+  --sidebar-hover: #262626;
+  --sidebar-active: #1e3660;
+  --sidebar-border: #2a2a2a;
+  --main-bg: #f0f2f5;
+  --card-bg: #ffffff;
+  --border: #e4e7eb;
+  --border-light: #f0f2f5;
+  --txt: #111827;
+  --txt-muted: #6b7280;
+  --txt-side: #d1d5db;
+  --txt-side-muted: #6b7280;
+  --accent: #4f46e5;
+  --accent-h: #4338ca;
+
+  --red: #dc2626;      --red-bg: #fef2f2;   --red-bdr: #fca5a5;
+  --amber: #d97706;    --amb-bg: #fffbeb;   --amb-bdr: #fcd34d;
+  --green: #16a34a;    --grn-bg: #f0fdf4;   --grn-bdr: #86efac;
+
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+}
+
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: var(--txt);
+  display: flex;
+  background: var(--main-bg);
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+#sidebar ::-webkit-scrollbar-thumb { background: #3a3a3a; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  border-right: 1px solid var(--sidebar-border);
+}
+
+.sidebar-top {
+  padding: 18px 14px 14px;
+  border-bottom: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
+  padding: 0 2px;
+}
+
+.logo-icon { font-size: 20px; }
+
+#new-btn {
+  width: 100%;
+  padding: 9px 12px;
+  background: #262626;
+  color: var(--txt-side);
+  border: 1px solid #363636;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: background 0.12s;
+}
+#new-btn:hover { background: #333; }
+#new-btn svg { opacity: .7; flex-shrink: 0; }
+
+.sidebar-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 8px 16px;
+}
+
+.history-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--txt-side-muted);
+  padding: 10px 8px 5px;
+}
+
+.report-item {
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.1s;
+  margin-bottom: 1px;
+  user-select: none;
+}
+.report-item:hover { background: var(--sidebar-hover); }
+.report-item.active { background: var(--sidebar-active); }
+
+.ri-repo {
+  color: var(--txt-side);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.ri-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ri-date {
+  font-size: 11px;
+  color: var(--txt-side-muted);
+}
+
+.vbadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  flex-shrink: 0;
+}
+.vbadge-RED   { background: #3d1212; color: #f87171; }
+.vbadge-AMBER { background: #3d2a00; color: #fbbf24; }
+.vbadge-GREEN { background: #0d2e17; color: #4ade80; }
+.vbadge-\?    { background: #2a2a2a; color: #666; }
+
+.sidebar-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
+}
+.sidebar-footer-text {
+  font-size: 11px;
+  color: var(--txt-side-muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ── Main ────────────────────────────────────────────────────────────── */
+#main {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Home view ───────────────────────────────────────────────────────── */
+#view-home {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 40px 24px;
+}
+#view-home.hidden { display: none; }
+
+.home-shield { font-size: 56px; line-height: 1; }
+
+.home-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--txt);
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.home-sub {
+  font-size: 14px;
+  color: var(--txt-muted);
+  text-align: center;
+  max-width: 440px;
+  line-height: 1.65;
+}
+
+.url-form {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 580px;
+  margin-top: 4px;
+}
+
+.url-input {
+  flex: 1;
+  padding: 13px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  color: var(--txt);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: var(--shadow);
+}
+.url-input::placeholder { color: #9ca3af; }
+.url-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79,70,229,.12);
+}
+
+.analyze-btn {
+  padding: 13px 22px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, transform 0.08s;
+  box-shadow: var(--shadow);
+}
+.analyze-btn:hover { background: var(--accent-h); }
+.analyze-btn:active { transform: scale(.98); }
+.analyze-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+.home-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 500px;
+}
+
+.home-pill {
+  font-size: 12px;
+  padding: 4px 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--txt-muted);
+  box-shadow: var(--shadow);
+}
+
+/* ── Progress view ───────────────────────────────────────────────────── */
+#view-progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+#view-progress.hidden { display: none; }
+
+.prog-wrap { width: 100%; max-width: 540px; }
+
+.prog-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--txt);
+  margin-bottom: 24px;
+  letter-spacing: -0.01em;
+}
+
+.prog-repo {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.prog-steps { display: flex; flex-direction: column; gap: 10px; }
+
+.pstep {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.pstep-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+.pstep-body { flex: 1; }
+
+.pstep-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--txt);
+  margin-bottom: 2px;
+}
+
+.pstep-detail { font-size: 12px; color: var(--txt-muted); }
+
+.domain-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.dpill {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+.dpill-RED   { background: var(--red-bg);  color: var(--red);   border-color: var(--red-bdr); }
+.dpill-AMBER { background: var(--amb-bg);  color: var(--amber); border-color: var(--amb-bdr); }
+.dpill-GREEN { background: var(--grn-bg);  color: var(--green); border-color: var(--grn-bdr); }
+
+@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.5 } }
+.pstep-active .pstep-icon { animation: pulse 1.4s ease-in-out infinite; }
+
+/* ── Report view ─────────────────────────────────────────────────────── */
+#view-report { display: flex; flex-direction: column; flex: 1; }
+#view-report.hidden { display: none; }
+
+.rpt-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(240,242,245,.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.rpt-toolbar-url {
+  font-size: 12.5px;
+  color: var(--txt-muted);
+  font-family: "SF Mono", "Fira Code", monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-new {
+  padding: 7px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+  flex-shrink: 0;
+}
+.btn-new:hover { background: var(--accent-h); }
+
+#rpt-body {
+  padding: 24px;
+  max-width: 980px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ── Report header card ──────────────────────────────────────────────── */
+.rpt-header {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 26px 28px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.rpt-header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.rpt-header.c-RED::before   { background: var(--red); }
+.rpt-header.c-AMBER::before { background: var(--amber); }
+.rpt-header.c-GREEN::before { background: var(--green); }
+
+.rpt-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.rpt-repo {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--txt);
+  letter-spacing: -0.01em;
+}
+
+.rpt-ts {
+  font-size: 11.5px;
+  color: var(--txt-muted);
+  margin-top: 5px;
+}
+
+.verdict-lg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.verdict-lg.RED   { background: var(--red-bg);  color: var(--red);   border: 1.5px solid var(--red-bdr); }
+.verdict-lg.AMBER { background: var(--amb-bg);  color: var(--amber); border: 1.5px solid var(--amb-bdr); }
+.verdict-lg.GREEN { background: var(--grn-bg);  color: var(--green); border: 1.5px solid var(--grn-bdr); }
+
+.tech-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+
+.tech-tag {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 9px;
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #e0e7ff;
+  border-radius: 6px;
+}
+
+.arch-text {
+  font-size: 13.5px;
+  color: var(--txt-muted);
+  line-height: 1.65;
+  margin-bottom: 18px;
+}
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.info-box {
+  background: #f8fafc;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 13px 15px;
+}
+
+.info-box-hd {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--txt-muted);
+  margin-bottom: 9px;
+}
+
+.info-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+
+.info-list li {
+  font-size: 12.5px;
+  color: var(--txt);
+  line-height: 1.5;
+  padding-left: 14px;
+  position: relative;
+}
+.info-list li::before {
+  content: '·';
+  position: absolute;
+  left: 3px;
+  color: var(--txt-muted);
+}
+.info-list.absent li::before { content: '–'; color: #ef4444; }
+
+/* ── Section header ──────────────────────────────────────────────────── */
+.sec-hd {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: var(--txt-muted);
+  margin-bottom: 12px;
+}
+
+/* ── Domain scorecards ───────────────────────────────────────────────── */
+.domain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.dc {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.dc::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 3px;
+}
+.dc.c-RED::before   { background: var(--red); }
+.dc.c-AMBER::before { background: var(--amber); }
+.dc.c-GREEN::before { background: var(--green); }
+
+.dc-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dc-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt);
+  line-height: 1.3;
+}
+
+.score-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.score-pill.RED   { background: var(--red-bg);  color: var(--red); }
+.score-pill.AMBER { background: var(--amb-bg);  color: var(--amber); }
+.score-pill.GREEN { background: var(--grn-bg);  color: var(--green); }
+
+.dc-summary { font-size: 11.5px; color: var(--txt-muted); line-height: 1.55; }
+
+/* ── Risk accordion ──────────────────────────────────────────────────── */
+.risk-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.risk-hd {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+.risk-hd:hover { background: #fafafa; }
+
+.risk-hd-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--txt);
+}
+
+.risk-cnt {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--txt-muted);
+  margin-left: 2px;
+}
+
+.risk-chevron {
+  color: var(--txt-muted);
+  font-size: 13px;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.risk-hd.open .risk-chevron { transform: rotate(180deg); }
+
+.risk-items { display: none; border-top: 1px solid var(--border-light); }
+.risk-items.open { display: block; }
+
+.risk-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border-light);
+}
+.risk-row:last-child { border-bottom: none; }
+
+.risk-vicon { font-size: 15px; line-height: 1.5; }
+
+.risk-body { min-width: 0; }
+
+.risk-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt);
+  margin-bottom: 4px;
+}
+
+.risk-ev {
+  font-size: 12px;
+  color: var(--txt-muted);
+  line-height: 1.6;
+}
+
+.sev-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  align-self: start;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.sev-critical { background: #fef2f2; color: #dc2626; }
+.sev-high     { background: #fff7ed; color: #ea580c; }
+.sev-medium   { background: #fffbeb; color: #d97706; }
+.sev-low      { background: #f0fdf4; color: #16a34a; }
+
+/* ── Compound risks ──────────────────────────────────────────────────── */
+.compound-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px 18px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  box-shadow: var(--shadow);
+}
+
+.cc-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+.cc-combo {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--txt);
+  margin-bottom: 7px;
+  line-height: 1.5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.rtag {
+  display: inline-block;
+  background: #eef2ff;
+  color: #4338ca;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.cc-sep { color: var(--txt-muted); font-weight: 400; font-size: 11px; }
+
+.cc-concern { font-size: 12.5px; color: var(--txt-muted); line-height: 1.6; }
+
+/* ── Recommendations ─────────────────────────────────────────────────── */
+.rec-list { display: flex; flex-direction: column; gap: 10px; }
+
+.rec-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px 18px;
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  box-shadow: var(--shadow);
+}
+
+.rec-num {
+  width: 26px;
+  height: 26px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.rec-text {
+  font-size: 13.5px;
+  color: var(--txt);
+  line-height: 1.65;
+  padding-top: 3px;
+}
+
+/* ── Overall verdict banner ──────────────────────────────────────────── */
+.verdict-banner {
+  border-radius: 16px;
+  padding: 36px 28px;
+  text-align: center;
+  border: 1.5px solid;
+}
+.verdict-banner.RED   { background: var(--red-bg);  border-color: var(--red-bdr); }
+.verdict-banner.AMBER { background: var(--amb-bg);  border-color: var(--amb-bdr); }
+.verdict-banner.GREEN { background: var(--grn-bg);  border-color: var(--grn-bdr); }
+
+.vb-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  margin-bottom: 10px;
+}
+.RED .vb-label   { color: var(--red); }
+.AMBER .vb-label { color: var(--amber); }
+.GREEN .vb-label { color: var(--green); }
+
+.vb-value {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.RED .vb-value   { color: var(--red); }
+.AMBER .vb-value { color: var(--amber); }
+.GREEN .vb-value { color: var(--green); }
+
+.vb-footer { margin-top: 12px; font-size: 13px; }
+.RED .vb-footer   { color: #b91c1c; }
+.AMBER .vb-footer { color: #92400e; }
+.GREEN .vb-footer { color: #14532d; }
+
+/* ── Empty state ─────────────────────────────────────────────────────── */
+.empty-history {
+  padding: 16px 8px;
+  font-size: 12px;
+  color: var(--txt-side-muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ── Error toast ─────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: #f9fafb;
+  padding: 11px 20px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  opacity: 0;
+  transition: opacity .25s;
+  pointer-events: none;
+  z-index: 100;
+  max-width: 480px;
+  text-align: center;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <div class="sidebar-top">
+    <div class="logo">
+      <span class="logo-icon">🛡</span>
+      Trust Swarm
+    </div>
+    <button id="new-btn" onclick="showHome()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      New Analysis
+    </button>
+  </div>
+
+  <div class="sidebar-history">
+    <div class="history-label">History</div>
+    <div id="history-list"></div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-text">22 risks · 5 domains · Claude-powered</div>
+  </div>
+</nav>
+
+<main id="main">
+
+  <!-- ── Home ────────────────────────────────────────────────────── -->
+  <div id="view-home">
+    <div class="home-shield">🛡</div>
+    <div class="home-title">Trust Swarm</div>
+    <div class="home-sub">
+      Assess any AI/agentic GitHub repository against 22 trust risks across
+      Security, Reliability, Transparency, Accountability, and Human Factors.
+    </div>
+    <form class="url-form" onsubmit="startAnalysis(event)">
+      <input id="url-input" class="url-input" type="url"
+             placeholder="https://github.com/owner/repo" required autocomplete="off" />
+      <button type="submit" class="analyze-btn" id="analyze-btn">Analyze →</button>
+    </form>
+    <div class="home-pills">
+      <span class="home-pill">🔒 Agent Hijacking</span>
+      <span class="home-pill">🔄 Cascading Errors</span>
+      <span class="home-pill">👁 Black Box Logic</span>
+      <span class="home-pill">⚖️ Accountability Gaps</span>
+      <span class="home-pill">🧠 Human Oversight</span>
+    </div>
+  </div>
+
+  <!-- ── Progress ─────────────────────────────────────────────────── -->
+  <div id="view-progress" class="hidden">
+    <div class="prog-wrap">
+      <div class="prog-title">
+        Analyzing <span class="prog-repo" id="prog-repo"></span>
+      </div>
+      <div class="prog-steps" id="prog-steps"></div>
+    </div>
+  </div>
+
+  <!-- ── Report ────────────────────────────────────────────────────── -->
+  <div id="view-report" class="hidden">
+    <div class="rpt-toolbar">
+      <span class="rpt-toolbar-url" id="toolbar-url"></span>
+      <button class="btn-new" onclick="showHome()">+ New Analysis</button>
+    </div>
+    <div id="rpt-body"></div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function relTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), now = new Date();
+  const s = Math.floor((now - d) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  if (s < 172800) return 'yesterday';
+  if (s < 604800) return `${Math.floor(s/86400)}d ago`;
+  return d.toLocaleDateString();
+}
+
+function ve(v) { return v === 'RED' ? '🔴' : v === 'AMBER' ? '🟡' : v === 'GREEN' ? '🟢' : '❓'; }
+function vi(v) { return v === 'PASS' ? '✅' : v === 'CONCERN' ? '⚠️' : v === 'FAIL' ? '❌' : '•'; }
+function se(s) { return ({critical:'🔴', high:'🟠', medium:'🟡', low:'🟢'})[s] || '•'; }
+
+function toast(msg, ms = 4000) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), ms);
+}
+
+const SEV_ORDER = {critical:0, high:1, medium:2, low:3};
+
+// ── Views ─────────────────────────────────────────────────────────────────
+let activeReportId = null;
+
+function showHome() {
+  $('view-home').classList.remove('hidden');
+  $('view-progress').classList.add('hidden');
+  $('view-report').classList.add('hidden');
+  activeReportId = null;
+  document.querySelectorAll('.report-item').forEach(el => el.classList.remove('active'));
+  $('url-input').value = '';
+  $('analyze-btn').disabled = false;
+}
+
+function showProgress(repoShort) {
+  $('view-home').classList.add('hidden');
+  $('view-progress').classList.remove('hidden');
+  $('view-report').classList.add('hidden');
+  $('prog-repo').textContent = repoShort;
+  $('prog-steps').innerHTML = '';
+}
+
+function showReport() {
+  $('view-home').classList.add('hidden');
+  $('view-progress').classList.add('hidden');
+  $('view-report').classList.remove('hidden');
+  $('main').scrollTop = 0;
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const reports = await fetch('/api/reports').then(r => r.json());
+    renderHistory(reports);
+  } catch { }
+}
+
+function renderHistory(reports) {
+  const list = $('history-list');
+  if (!reports.length) {
+    list.innerHTML = '<div class="empty-history">No reports yet.<br>Analyze a repo to get started.</div>';
+    return;
+  }
+  list.innerHTML = reports.map(r => `
+    <div class="report-item${r.id === activeReportId ? ' active' : ''}"
+         data-id="${esc(r.id)}" onclick="openReport('${esc(r.id)}')">
+      <div class="ri-repo">${esc(r.repo)}</div>
+      <div class="ri-meta">
+        <span class="ri-date">${relTime(r.timestamp)}</span>
+        <span class="vbadge vbadge-${esc(r.verdict)}">${esc(r.verdict)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Progress tracking ─────────────────────────────────────────────────────
+const PHASES = [
+  { key: 'Fetching repo',          label: 'Fetching repository',            icon: '📡', id: 'fetch'  },
+  { key: 'Fetched',                label: 'Repository files retrieved',     icon: '📁', id: 'files'  },
+  { key: '[Phase 1]',              label: 'Reading repo with Claude',       icon: '🔍', id: 'phase1' },
+  { key: '[Phase 2] Running',      label: 'Running 5 domain specialists',   icon: '🔬', id: 'phase2' },
+  { key: '[Phase 3]',              label: 'Holistic cross-domain analysis', icon: '🧠', id: 'phase3' },
+];
+
+let stepsDone = {};
+let domainsDone = {};
+
+function initProgress() {
+  stepsDone = {};
+  domainsDone = {};
+  renderProg();
+}
+
+function handleProgressLine(line) {
+  // Domain specialist completion
+  const dm = line.match(/\[Phase 2\] (.+?) specialist complete — (RED|AMBER|GREEN)/);
+  if (dm) {
+    domainsDone[dm[1]] = dm[2];
+    stepsDone['phase2'] = true;
+    renderProg();
+    return;
+  }
+  for (const ph of PHASES) {
+    if (line.includes(ph.key) && !stepsDone[ph.id]) {
+      stepsDone[ph.id] = true;
+      renderProg();
+      break;
+    }
+  }
+}
+
+function renderProg() {
+  const doneIds = Object.keys(stepsDone);
+  if (!doneIds.length) return;
+
+  const lastDone = PHASES.slice().reverse().find(p => stepsDone[p.id]);
+  const lastIdx = lastDone ? PHASES.indexOf(lastDone) : -1;
+
+  const html = PHASES
+    .filter((_, i) => i <= lastIdx + 1)
+    .map((ph, i, arr) => {
+      const done = stepsDone[ph.id];
+      const isLast = i === arr.length - 1;
+      const active = isLast && !done;
+
+      let extra = '';
+      if (ph.id === 'phase2' && Object.keys(domainsDone).length) {
+        extra = `<div class="domain-pills">` +
+          Object.entries(domainsDone).map(([d, s]) =>
+            `<span class="dpill dpill-${s}">${esc(d)} ${ve(s)}</span>`
+          ).join('') + `</div>`;
+      }
+
+      return `<div class="pstep${active ? ' pstep-active' : ''}">
+        <span class="pstep-icon">${done ? '✅' : (active ? ph.icon : ph.icon)}</span>
+        <div class="pstep-body">
+          <div class="pstep-label">${ph.label}</div>
+          ${extra}
+        </div>
+      </div>`;
+    }).join('');
+
+  $('prog-steps').innerHTML = html;
+}
+
+// ── Analysis ──────────────────────────────────────────────────────────────
+function startAnalysis(e) {
+  e.preventDefault();
+  const url = $('url-input').value.trim();
+  if (!url) return;
+
+  const repoShort = url.replace('https://github.com/', '');
+  initProgress();
+  showProgress(repoShort);
+
+  const src = new EventSource(`/api/run?url=${encodeURIComponent(url)}`);
+
+  src.addEventListener('progress', ev => {
+    handleProgressLine(JSON.parse(ev.data));
+  });
+
+  src.addEventListener('complete', async ev => {
+    src.close();
+    const { id } = JSON.parse(ev.data);
+    await loadHistory();
+    await openReport(id);
+  });
+
+  src.addEventListener('analysis_error', ev => {
+    src.close();
+    const msg = JSON.parse(ev.data);
+    toast('Analysis failed: ' + msg);
+    showHome();
+  });
+
+  src.onerror = () => {
+    // Only fires on connection issues; the analysis_error event covers app-level errors
+  };
+}
+
+// ── Report rendering ──────────────────────────────────────────────────────
+async function openReport(id) {
+  try {
+    const report = await fetch(`/api/reports/${id}`).then(r => {
+      if (!r.ok) throw new Error('Not found');
+      return r.json();
+    });
+
+    activeReportId = id;
+    document.querySelectorAll('.report-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.id === id);
+    });
+
+    renderReport(report);
+    showReport();
+  } catch (err) {
+    toast('Could not load report: ' + err.message);
+  }
+}
+
+function renderReport(r) {
+  const brief = r.trust_brief || {};
+  const verdict = r.overall_verdict || '?';
+
+  $('toolbar-url').textContent = (r.url || '').replace('https://', '');
+
+  $('rpt-body').innerHTML = [
+    buildHeader(brief, verdict, r.timestamp),
+    buildScorecards(r.domain_results || []),
+    buildRiskDetail(r.domain_results || []),
+    buildCompound(r.holistic || {}),
+    buildRecs(r.holistic || {}),
+    buildBanner(verdict),
+    '<div style="height:24px"></div>',
+  ].join('');
+
+  // Wire accordions
+  $('rpt-body').querySelectorAll('.risk-hd').forEach(hd => {
+    hd.addEventListener('click', () => {
+      hd.classList.toggle('open');
+      hd.nextElementSibling.classList.toggle('open');
+    });
+  });
+}
+
+function buildHeader(brief, verdict, ts) {
+  const safety = brief.safety_mechanisms_observed || [];
+  const absent = brief.notable_absences || [];
+  const tags = (brief.tech_stack || []).slice(0, 14)
+    .map(t => `<span class="tech-tag">${esc(t)}</span>`).join('');
+
+  const safetyBox = safety.length ? `
+    <div class="info-box">
+      <div class="info-box-hd">✅ Safety mechanisms observed</div>
+      <ul class="info-list">${safety.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
+    </div>` : '';
+
+  const absentBox = absent.length ? `
+    <div class="info-box">
+      <div class="info-box-hd">⚠️ Notable absences</div>
+      <ul class="info-list absent">${absent.map(a => `<li>${esc(a)}</li>`).join('')}</ul>
+    </div>` : '';
+
+  const infoGrid = (safetyBox || absentBox)
+    ? `<div class="info-grid">${safetyBox}${absentBox}</div>` : '';
+
+  return `
+    <div class="rpt-header c-${verdict}">
+      <div class="rpt-header-top">
+        <div>
+          <div class="rpt-repo">${esc(brief.repo || '—')}</div>
+          <div class="rpt-ts">${relTime(ts)}</div>
+        </div>
+        <div class="verdict-lg ${verdict}">${ve(verdict)} ${verdict}</div>
+      </div>
+      ${tags ? `<div class="tech-tags">${tags}</div>` : ''}
+      ${brief.agent_architecture ? `<div class="arch-text">${esc(brief.agent_architecture)}</div>` : ''}
+      ${infoGrid}
+    </div>`;
+}
+
+function buildScorecards(domains) {
+  const cards = domains.map(d => `
+    <div class="dc c-${d.overall_domain_score}">
+      <div class="dc-top">
+        <div class="dc-name">${esc(d.domain)}</div>
+        <span class="score-pill ${d.overall_domain_score}">${ve(d.overall_domain_score)} ${d.overall_domain_score}</span>
+      </div>
+      <div class="dc-summary">${esc(d.domain_summary)}</div>
+    </div>`).join('');
+
+  return `<div>
+    <div class="sec-hd">Domain Scorecards</div>
+    <div class="domain-grid">${cards}</div>
+  </div>`;
+}
+
+function buildRiskDetail(domains) {
+  const sections = domains.map((d, i) => {
+    const sorted = [...(d.risks_assessed || [])].sort((a, b) => {
+      const ds = (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9);
+      if (ds !== 0) return ds;
+      return (a.verdict === 'PASS' ? 1 : 0) - (b.verdict === 'PASS' ? 1 : 0);
+    });
+
+    const rows = sorted.map(r => `
+      <div class="risk-row">
+        <span class="risk-vicon">${vi(r.verdict)}</span>
+        <div class="risk-body">
+          <div class="risk-name">${esc(r.risk)}</div>
+          <div class="risk-ev">${esc(r.evidence)}</div>
+        </div>
+        <span class="sev-pill sev-${r.severity}">${r.severity}</span>
+      </div>`).join('');
+
+    const scoreCol = {RED:'#dc2626', AMBER:'#d97706', GREEN:'#16a34a'}[d.overall_domain_score] || '#666';
+
+    return `
+      <div class="risk-section">
+        <div class="risk-hd${i === 0 ? ' open' : ''}">
+          <div class="risk-hd-left">
+            <span style="color:${scoreCol}">${ve(d.overall_domain_score)}</span>
+            ${esc(d.domain)}
+            <span class="risk-cnt">${d.risks_assessed.length} risks</span>
+          </div>
+          <span class="risk-chevron">▾</span>
+        </div>
+        <div class="risk-items${i === 0 ? ' open' : ''}">${rows}</div>
+      </div>`;
+  }).join('');
+
+  return `<div>
+    <div class="sec-hd">Risk Detail</div>
+    <div style="display:flex;flex-direction:column;gap:10px">${sections}</div>
+  </div>`;
+}
+
+function buildCompound(holistic) {
+  const risks = holistic.compound_risks || [];
+  if (!risks.length) {
+    return `<div>
+      <div class="sec-hd">Compound Risks</div>
+      <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);padding:18px;color:var(--txt-muted);font-size:13px;box-shadow:var(--shadow)">
+        No significant compound risks identified.
+      </div>
+    </div>`;
+  }
+
+  const cards = risks.map(cr => {
+    const combo = cr.risk_combination.map((r, i, a) =>
+      `<span class="rtag">${esc(r)}</span>${i < a.length - 1 ? '<span class="cc-sep">+</span>' : ''}`
+    ).join(' ');
+
+    return `<div class="compound-card">
+      <span class="cc-icon">${se(cr.severity)}</span>
+      <div>
+        <div class="cc-combo">${combo} <span class="sev-pill sev-${cr.severity}" style="margin-left:4px">${cr.severity}</span></div>
+        <div class="cc-concern">${esc(cr.emergent_concern)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div>
+    <div class="sec-hd">Compound Risks</div>
+    <div style="display:flex;flex-direction:column;gap:10px">${cards}</div>
+  </div>`;
+}
+
+function buildRecs(holistic) {
+  const recs = holistic.top_3_recommendations || [];
+  const items = recs.map((r, i) => `
+    <div class="rec-item">
+      <div class="rec-num">${i + 1}</div>
+      <div class="rec-text">${esc(r)}</div>
+    </div>`).join('');
+
+  return `<div>
+    <div class="sec-hd">Top Recommendations</div>
+    <div class="rec-list">${items}</div>
+  </div>`;
+}
+
+function buildBanner(verdict) {
+  const labels = {RED: '⚠️ High Risk — Action Required', AMBER: '⚡ Moderate Risk — Review Advised', GREEN: '✅ Low Risk — Generally Trustworthy'};
+  const emoji = {RED: '🔴', AMBER: '🟡', GREEN: '🟢'}[verdict] || '';
+  return `
+    <div class="verdict-banner ${verdict}">
+      <div class="vb-label">${labels[verdict] || verdict}</div>
+      <div class="vb-value">${emoji} ${verdict}</div>
+    </div>`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadHistory();
+</script>
+</body>
+</html>

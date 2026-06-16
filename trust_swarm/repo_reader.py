@@ -15,8 +15,8 @@ TRUST_BRIEF_SCHEMA = {
             "agent_architecture": {"type": "string"},
             "key_files_found": {"type": "array", "items": {"type": "string"}},
             "system_prompt_excerpts": {
-                "type": "object",
-                "additionalProperties": {"type": "string"},
+                "type": "array",
+                "items": {"type": "string"},
             },
             "safety_mechanisms_observed": {"type": "array", "items": {"type": "string"}},
             "notable_absences": {"type": "array", "items": {"type": "string"}},
@@ -45,7 +45,7 @@ def read_repo(repo_slug: str, files: list[dict]) -> dict:
     user_content = f"Repository: {repo_slug}\n\n{_format_files(files)}"
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-sonnet-4-5-20250929",
         max_tokens=4096,
         system=build_repo_reader_prompt(),
         messages=[{"role": "user", "content": user_content}],
