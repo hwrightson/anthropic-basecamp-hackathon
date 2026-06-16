@@ -27,7 +27,7 @@ HOLISTIC_SCHEMA = {
             "top_3_recommendations": {
                 "type": "array",
                 "items": {"type": "string"},
-                "minItems": 1,
+                "minItems": 3,
                 "maxItems": 3,
             },
         },
