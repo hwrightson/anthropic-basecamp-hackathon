@@ -1498,7 +1498,7 @@ function buildRiskDetail(domains) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
           <span class="sev-pill sev-${r.severity}">${r.severity}</span>
-          ${r.confidence?`<span class="conf-pill ${r.confidence}">${r.confidence}</span>`:''}
+          ${r.confidence && r.confidence !== 'high'?`<span class="conf-pill ${r.confidence}">${r.confidence} conf</span>`:''}
         </div>
       </div>`).join('');
     const col={RED:'var(--red)',AMBER:'var(--amb)',GREEN:'var(--grn)'}[d.overall_domain_score]||'var(--txt3)';
