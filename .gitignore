@@ -9,3 +9,7 @@ build/
 venv/
 .pytest_cache/
 trust_report.json
+.DS_Store
+*.log
+web/reports/
+"ChatGPT Image*"
