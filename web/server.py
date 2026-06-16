@@ -162,6 +162,16 @@ async def run_analysis(url: str, request: Request) -> StreamingResponse:
         tmpdir = REPORTS_DIR / f"tmp_{run_id}"
         tmpdir.mkdir(exist_ok=True)
 
+        # Stable fallback path: main.py always writes here regardless of CWD
+        def _slug(u: str) -> str:
+            u = u.rstrip("/")
+            for prefix in ("https://github.com/", "http://github.com/", "github.com/"):
+                if u.lower().startswith(prefix):
+                    return u[len(prefix):].replace("/", "-").replace("\\", "-")
+            return u.replace("/", "-").replace("\\", "-")
+
+        stable_json = PROJECT_ROOT / "outputs" / _slug(url) / "trust_report.json"
+
         env = os.environ.copy()
         env["PYTHONPATH"] = str(PROJECT_ROOT)
         env["TRUST_SWARM_AUDIT_LOG"] = str(PROJECT_ROOT / "web_audit.log")
@@ -184,14 +194,17 @@ async def run_analysis(url: str, request: Request) -> StreamingResponse:
 
             await proc.wait()
 
-            if proc.returncode != 0:
-                _audit({"event": "analysis_failed", "url": url, "ip": ip, "run_id": run_id})
-                yield f"event: analysis_error\ndata: {json.dumps('Analysis failed — check server logs')}\n\n"
-                return
-
+            # Prefer CWD output; fall back to the stable outputs/ path that main.py
+            # always writes (even if the subprocess exited non-zero due to a pipe error
+            # after successfully completing the analysis).
             json_path = tmpdir / "trust_report.json"
             if not json_path.exists():
-                yield f"event: analysis_error\ndata: {json.dumps('Report file not found')}\n\n"
+                json_path = stable_json
+
+            if not json_path.exists():
+                _audit({"event": "analysis_failed", "url": url, "ip": ip, "run_id": run_id,
+                        "returncode": proc.returncode})
+                yield f"event: analysis_error\ndata: {json.dumps('Analysis failed — check server logs')}\n\n"
                 return
 
             data = json.loads(json_path.read_text())
