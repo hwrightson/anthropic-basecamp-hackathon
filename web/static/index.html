@@ -947,6 +947,24 @@ body { display: flex; }
 .risk-items { display: none; border-top: 1px solid var(--bdr); }
 .risk-items.open { display: block; }
 
+.risk-col-hd {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 12px;
+  padding: 5px 18px 5px;
+  border-bottom: 1px solid var(--bdr);
+  background: var(--bg);
+}
+.risk-col-hd span {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--txt3);
+}
+.risk-col-hd .rch-right { text-align: right; }
+
 .risk-row {
   display: grid;
   grid-template-columns: 18px 1fr auto;
@@ -1489,16 +1507,18 @@ function buildRiskDetail(domains) {
       const ds=(SEV_ORDER[a.severity]??9)-(SEV_ORDER[b.severity]??9);
       return ds!==0?ds:(a.verdict==='PASS'?1:0)-(b.verdict==='PASS'?1:0);
     });
+    const verdictLabel = v => ({PASS:'Pass',CONCERN:'Concern',FAIL:'Fail'})[v]||v;
     const rows=sorted.map(r=>`
       <div class="risk-row">
-        <span class="risk-vicon" style="color:${r.verdict==='PASS'?'#16a34a':r.verdict==='CONCERN'?'#d97706':'#dc2626'}">${vi(r.verdict)}</span>
+        <span class="risk-vicon" style="color:${r.verdict==='PASS'?'#16a34a':r.verdict==='CONCERN'?'#d97706':'#dc2626'}"
+              title="Verdict: ${verdictLabel(r.verdict)}">${vi(r.verdict)}</span>
         <div class="risk-body">
           <div class="risk-name">${esc(r.risk)}</div>
           <div class="risk-ev">${esc(r.evidence)}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
-          <span class="sev-pill sev-${r.severity}">${r.severity}</span>
-          ${r.confidence && r.confidence !== 'high'?`<span class="conf-pill ${r.confidence}">${r.confidence} conf</span>`:''}
+          <span class="sev-pill sev-${r.severity}" title="Severity: ${r.severity}">${r.severity}</span>
+          ${r.confidence && r.confidence !== 'high'?`<span class="conf-pill ${r.confidence}" title="Assessment confidence: ${r.confidence}">${r.confidence} conf</span>`:''}
         </div>
       </div>`).join('');
     const col={RED:'var(--red)',AMBER:'var(--amb)',GREEN:'var(--grn)'}[d.overall_domain_score]||'var(--txt3)';
@@ -1511,7 +1531,14 @@ function buildRiskDetail(domains) {
         </div>
         <span class="risk-chevron">▾</span>
       </div>
-      <div class="risk-items${i===0?' open':''}">${rows}</div>
+      <div class="risk-items${i===0?' open':''}">
+        <div class="risk-col-hd">
+          <span></span>
+          <span>Risk &amp; Evidence</span>
+          <span class="rch-right">Severity</span>
+        </div>
+        ${rows}
+      </div>
     </div>`;
   }).join('');
   return `<div><div class="sec-hd">Risk Detail</div><div style="display:flex;flex-direction:column;gap:8px">${sections}</div></div>`;
