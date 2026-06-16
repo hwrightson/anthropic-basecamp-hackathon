@@ -39,7 +39,7 @@ def run_holistic_specialist(domain_results: list[dict]) -> dict:
     """Phase 3: review all domain results for compound/emergent risks."""
     print("[Phase 3] Running holistic specialist...", file=sys.stderr)
 
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(max_retries=3)
     user_content = (
         "Here are the domain specialist assessments:\n\n"
         + json.dumps(domain_results, indent=2)

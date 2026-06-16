@@ -52,6 +52,7 @@ Return a JSON object with exactly these fields:
   - verdict (string): PASS | CONCERN | FAIL
   - evidence (string): specific evidence from the brief — cite file names and observations. If PASS, state what you looked for and didn't find.
   - severity (string): critical | high | medium | low — only meaningful for CONCERN/FAIL; use "low" for PASS
+  - confidence (string): high | medium | low — your confidence in this assessment given the available evidence
 - domain_summary (string): 1-2 sentence summary of the domain's overall trust posture
 - overall_domain_score (string): GREEN | AMBER | RED
 

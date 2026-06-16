@@ -673,6 +673,63 @@ body {
 .sev-medium   { background: #fffbeb; color: #d97706; }
 .sev-low      { background: #f0fdf4; color: #16a34a; }
 
+.conf-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #f3f4f6;
+  color: #6b7280;
+  white-space: nowrap;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.conf-pill.high   { background: #eff6ff; color: #1d4ed8; }
+.conf-pill.medium { background: #fafaf9; color: #78716c; }
+.conf-pill.low    { background: #fef9c3; color: #854d0e; }
+
+/* ── Draft / publish bar ─────────────────────────────────────────────── */
+.draft-bar {
+  background: #fffbeb;
+  border-bottom: 1px solid #fcd34d;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: #92400e;
+}
+
+.draft-bar-msg { display: flex; align-items: center; gap: 7px; }
+
+.publish-btn {
+  padding: 6px 16px;
+  background: #d97706;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+.publish-btn:hover { background: #b45309; }
+
+.draft-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #3d2a00;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-left: 4px;
+}
+
 /* ── Compound risks ──────────────────────────────────────────────────── */
 .compound-card {
   background: var(--card-bg);
@@ -883,6 +940,12 @@ body {
       <span class="rpt-toolbar-url" id="toolbar-url"></span>
       <button class="btn-new" onclick="showHome()">+ New Analysis</button>
     </div>
+    <div id="draft-bar" class="draft-bar" style="display:none">
+      <div class="draft-bar-msg">
+        ⚠️ <strong>Draft — pending human review.</strong> Verify this assessment before publishing.
+      </div>
+      <button class="publish-btn" onclick="publishReport()">Publish Report</button>
+    </div>
     <div id="rpt-body"></div>
   </div>
 
@@ -973,7 +1036,7 @@ function renderHistory(reports) {
   list.innerHTML = reports.map(r => `
     <div class="report-item${r.id === activeReportId ? ' active' : ''}"
          data-id="${esc(r.id)}" onclick="openReport('${esc(r.id)}')">
-      <div class="ri-repo">${esc(r.repo)}</div>
+      <div class="ri-repo">${esc(r.repo)}${r.published === false ? '<span class="draft-badge">draft</span>' : ''}</div>
       <div class="ri-meta">
         <span class="ri-date">${relTime(r.timestamp)}</span>
         <span class="vbadge vbadge-${esc(r.verdict)}">${esc(r.verdict)}</span>
@@ -1102,8 +1165,29 @@ async function openReport(id) {
 
     renderReport(report);
     showReport();
+    // Show draft bar if report hasn't been human-reviewed
+    const draftBar = $('draft-bar');
+    if (report.published === false) {
+      draftBar.style.display = 'flex';
+      draftBar.dataset.id = id;
+    } else {
+      draftBar.style.display = 'none';
+    }
   } catch (err) {
     toast('Could not load report: ' + err.message);
+  }
+}
+
+async function publishReport() {
+  const id = $('draft-bar').dataset.id;
+  if (!id) return;
+  try {
+    await fetch(`/api/reports/${id}/publish`, { method: 'POST' });
+    $('draft-bar').style.display = 'none';
+    toast('Report published.');
+    await loadHistory();
+  } catch (err) {
+    toast('Publish failed: ' + err.message);
   }
 }
 
@@ -1199,7 +1283,10 @@ function buildRiskDetail(domains) {
           <div class="risk-name">${esc(r.risk)}</div>
           <div class="risk-ev">${esc(r.evidence)}</div>
         </div>
-        <span class="sev-pill sev-${r.severity}">${r.severity}</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+          <span class="sev-pill sev-${r.severity}">${r.severity}</span>
+          ${r.confidence ? `<span class="conf-pill ${r.confidence}" title="Confidence">${r.confidence} conf.</span>` : ''}
+        </div>
       </div>`).join('');
 
     const scoreCol = {RED:'#dc2626', AMBER:'#d97706', GREEN:'#16a34a'}[d.overall_domain_score] || '#666';

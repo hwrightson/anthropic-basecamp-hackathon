@@ -41,7 +41,7 @@ def read_repo(repo_slug: str, files: list[dict]) -> dict:
     """Phase 1: produce a structured trust brief from fetched repo files."""
     print("[Phase 1] Analysing repo with Claude...", file=sys.stderr)
 
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(max_retries=3)
     user_content = f"Repository: {repo_slug}\n\n{_format_files(files)}"
 
     response = client.messages.create(

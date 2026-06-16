@@ -89,9 +89,52 @@ def fetch_repo_files(owner: str, repo: str, github_token: str | None = None) -> 
     return files
 
 
+def fetch_local(path: str) -> tuple[str, list[dict]]:
+    """Fetch prioritised files from a local directory. Returns (repo_slug, files)."""
+    from pathlib import Path
+    root = Path(path).resolve()
+    repo_name = root.name
+
+    all_entries = []
+    for p in root.rglob("*"):
+        if p.is_file() and any(p.suffix.lower() == ext for ext in ALLOWED_EXTENSIONS):
+            rel = str(p.relative_to(root))
+            # Skip hidden dirs and common noise
+            parts = rel.split("/")
+            if any(part.startswith(".") for part in parts):
+                continue
+            if any(part in ("node_modules", "__pycache__", ".git", "venv", ".venv") for part in parts):
+                continue
+            all_entries.append({"type": "blob", "path": rel})
+
+    prioritised = prioritise_files(all_entries)[:MAX_FILES]
+
+    files: list[dict] = []
+    total_bytes = 0
+    for entry in prioritised:
+        if total_bytes >= MAX_TOTAL_BYTES:
+            break
+        try:
+            text = (root / entry["path"]).read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        total_bytes += len(text.encode())
+        if total_bytes > MAX_TOTAL_BYTES:
+            break
+        files.append({"path": entry["path"], "content": text})
+
+    return repo_name, files
+
+
 def fetch(github_url: str) -> tuple[str, list[dict]]:
-    """Top-level entry: parse URL, fetch files. Returns (repo_slug, files)."""
-    owner, repo = parse_github_url(github_url)
-    token = os.getenv("GITHUB_TOKEN")
-    files = fetch_repo_files(owner, repo, github_token=token)
-    return f"{owner}/{repo}", files
+    """Top-level entry: parse URL or local path, fetch files. Returns (repo_slug, files)."""
+    import os as _os
+    from trust_swarm.sanitizer import sanitise
+    if _os.path.isdir(github_url):
+        slug, files = fetch_local(github_url)
+    else:
+        owner, repo = parse_github_url(github_url)
+        token = os.getenv("GITHUB_TOKEN")
+        files = fetch_repo_files(owner, repo, github_token=token)
+        slug = f"{owner}/{repo}"
+    return slug, sanitise(files)

@@ -23,8 +23,9 @@ DOMAIN_RESULT_SCHEMA = {
                         "verdict": {"type": "string", "enum": ["PASS", "CONCERN", "FAIL"]},
                         "evidence": {"type": "string"},
                         "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
+                        "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
                     },
-                    "required": ["risk", "principle", "verdict", "evidence", "severity"],
+                    "required": ["risk", "principle", "verdict", "evidence", "severity", "confidence"],
                     "additionalProperties": False,
                 },
             },
@@ -62,7 +63,7 @@ async def _run_specialist(
 
 
 async def _run_all_specialists(trust_brief: dict) -> list[dict]:
-    client = anthropic.AsyncAnthropic()
+    client = anthropic.AsyncAnthropic(max_retries=3)
     tasks = [
         _run_specialist(
             client,

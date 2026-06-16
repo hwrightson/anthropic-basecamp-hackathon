@@ -2,11 +2,13 @@ import hashlib
 import json
 import os
 import sys
+import time
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -14,6 +16,55 @@ PROJECT_ROOT = Path(__file__).parent.parent
 REPORTS_DIR = Path(__file__).parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
 STATIC_DIR = Path(__file__).parent / "static"
+
+# ── Auth & rate limiting ──────────────────────────────────────────────────────
+
+_API_KEY = os.getenv("TRUST_SWARM_API_KEY", "")
+
+# Simple in-memory rate limiter: max 10 analysis requests per IP per hour
+_rate_counters: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT = int(os.getenv("TRUST_SWARM_RATE_LIMIT", "10"))
+_RATE_WINDOW = 3600  # seconds
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    return forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+
+
+def _check_rate_limit(ip: str) -> None:
+    now = time.time()
+    timestamps = _rate_counters[ip]
+    # Drop entries older than window
+    _rate_counters[ip] = [t for t in timestamps if now - t < _RATE_WINDOW]
+    if len(_rate_counters[ip]) >= _RATE_LIMIT:
+        raise HTTPException(status_code=429, detail=f"Rate limit exceeded: max {_RATE_LIMIT} analyses per hour")
+    _rate_counters[ip].append(now)
+
+
+def _require_api_key(request: Request) -> None:
+    if not _API_KEY:
+        return  # Auth disabled when env var not set
+    key = request.headers.get("X-API-Key") or request.query_params.get("api_key", "")
+    if key != _API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
+# ── Audit logging ─────────────────────────────────────────────────────────────
+
+_AUDIT_LOG = Path(os.getenv("TRUST_SWARM_AUDIT_LOG", "web_audit.log"))
+
+
+def _audit(record: dict) -> None:
+    record["ts"] = datetime.now(timezone.utc).isoformat()
+    try:
+        with _AUDIT_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record) + "\n")
+    except Exception as exc:
+        print(f"[web] Audit log write failed: {exc}", file=sys.stderr)
+
+
+# ── FastAPI app ───────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Trust Swarm")
 
@@ -27,6 +78,7 @@ def _meta(data: dict) -> dict:
         "url": data.get("url", ""),
         "timestamp": data.get("timestamp", ""),
         "verdict": data.get("overall_verdict") or data.get("holistic", {}).get("overall_verdict", "?"),
+        "published": data.get("published", True),  # legacy reports treated as published
     }
 
 
@@ -51,6 +103,7 @@ def import_existing_reports() -> None:
                 "timestamp": datetime.fromtimestamp(json_path.stat().st_mtime, tz=timezone.utc).isoformat(),
                 "repo": repo,
                 "overall_verdict": verdict,
+                "published": True,  # CLI-generated reports are auto-published
             })
             dest.write_text(json.dumps(raw, indent=2))
         except Exception as exc:
@@ -60,7 +113,8 @@ def import_existing_reports() -> None:
 # ── API endpoints ─────────────────────────────────────────────────────────────
 
 @app.get("/api/reports")
-def list_reports() -> list[dict]:
+def list_reports(request: Request) -> list[dict]:
+    _require_api_key(request)
     reports = []
     for f in sorted(REPORTS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
@@ -71,7 +125,8 @@ def list_reports() -> list[dict]:
 
 
 @app.get("/api/reports/{report_id}")
-def get_report(report_id: str) -> dict:
+def get_report(report_id: str, request: Request) -> dict:
+    _require_api_key(request)
     safe_id = "".join(c for c in report_id if c.isalnum() or c == "-")
     path = REPORTS_DIR / f"{safe_id}.json"
     if not path.exists():
@@ -79,8 +134,29 @@ def get_report(report_id: str) -> dict:
     return json.loads(path.read_text())
 
 
+@app.post("/api/reports/{report_id}/publish")
+def publish_report(report_id: str, request: Request) -> dict:
+    """Human review gate: explicitly mark a report as published."""
+    _require_api_key(request)
+    safe_id = "".join(c for c in report_id if c.isalnum() or c == "-")
+    path = REPORTS_DIR / f"{safe_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Report not found")
+    data = json.loads(path.read_text())
+    data["published"] = True
+    data["published_at"] = datetime.now(timezone.utc).isoformat()
+    path.write_text(json.dumps(data, indent=2))
+    _audit({"event": "report_published", "report_id": safe_id, "repo": data.get("repo"), "ip": _client_ip(request)})
+    return {"status": "published", "id": safe_id}
+
+
 @app.get("/api/run")
-async def run_analysis(url: str) -> StreamingResponse:
+async def run_analysis(url: str, request: Request) -> StreamingResponse:
+    _require_api_key(request)
+    ip = _client_ip(request)
+    _check_rate_limit(ip)
+    _audit({"event": "analysis_requested", "url": url, "ip": ip})
+
     async def generate():
         run_id = str(uuid.uuid4())
         tmpdir = REPORTS_DIR / f"tmp_{run_id}"
@@ -88,6 +164,7 @@ async def run_analysis(url: str) -> StreamingResponse:
 
         env = os.environ.copy()
         env["PYTHONPATH"] = str(PROJECT_ROOT)
+        env["TRUST_SWARM_AUDIT_LOG"] = str(PROJECT_ROOT / "web_audit.log")
 
         stdout_fh = open(str(tmpdir / "report.md"), "w")
         try:
@@ -108,6 +185,7 @@ async def run_analysis(url: str) -> StreamingResponse:
             await proc.wait()
 
             if proc.returncode != 0:
+                _audit({"event": "analysis_failed", "url": url, "ip": ip, "run_id": run_id})
                 yield f"event: analysis_error\ndata: {json.dumps('Analysis failed — check server logs')}\n\n"
                 return
 
@@ -118,15 +196,19 @@ async def run_analysis(url: str) -> StreamingResponse:
 
             data = json.loads(json_path.read_text())
             repo = data.get("trust_brief", {}).get("repo", url)
+            verdict = data.get("overall_verdict") or data.get("holistic", {}).get("overall_verdict", "?")
             data.update({
                 "id": run_id,
                 "url": url,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "repo": repo,
+                "published": False,  # requires human review before publishing
             })
             (REPORTS_DIR / f"{run_id}.json").write_text(json.dumps(data, indent=2))
+            _audit({"event": "analysis_complete", "url": url, "ip": ip, "run_id": run_id, "verdict": verdict})
 
         except Exception as exc:
+            _audit({"event": "analysis_error", "url": url, "ip": ip, "error": str(exc)})
             yield f"event: analysis_error\ndata: {json.dumps(str(exc))}\n\n"
             return
         finally:
