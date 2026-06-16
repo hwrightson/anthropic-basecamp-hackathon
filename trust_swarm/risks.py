@@ -333,4 +333,4 @@ DOMAIN_DISPLAY_NAMES: dict[str, str] = {
     "human_factors": "Human Factors",
 }
 
-RISK_BY_ID: dict[str, dict] = {r["id"]: r for r in RISKS}
+RISK_BY_ID: dict[str, dict[str, Any]] = {r["id"]: r for r in RISKS}

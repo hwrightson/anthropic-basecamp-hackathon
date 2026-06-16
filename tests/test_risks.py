@@ -26,3 +26,8 @@ def test_domain_groups_has_five_domains():
 def test_risk_by_id_lookup():
     risk = RISK_BY_ID["system_instability"]
     assert risk["domain"] == "reliability"
+
+
+def test_domain_display_names_covers_all_domains():
+    from trust_swarm.risks import DOMAIN_DISPLAY_NAMES
+    assert set(DOMAIN_DISPLAY_NAMES.keys()) == set(DOMAIN_GROUPS.keys())
